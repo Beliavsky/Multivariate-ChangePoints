@@ -1,0 +1,28 @@
+exec = xcorr_sim xcorr_fit
+FC   = gfortran
+opt  = -O3 -Wall -static -g
+
+all: $(exec)
+
+# Define objects
+obj_sim = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o io_utils.o xcorr_sim.o
+obj_fit = kind.o constants.o util.o basic_stats.o changepoint.o io_utils.o xcorr_fit.o
+
+# Generic rule
+%.o: %.f90
+	$(FC) $(opt) -c $<
+
+xcorr_sim: $(obj_sim)
+	$(FC) $(opt) -o xcorr_sim $(obj_sim)
+
+xcorr_fit: $(obj_fit)
+	$(FC) $(opt) -o xcorr_fit $(obj_fit)
+
+run_sim: xcorr_sim
+	./xcorr_sim
+
+run_fit: xcorr_fit
+	./xcorr_fit
+
+clean:
+	rm -f *.o *.mod $(exec)
