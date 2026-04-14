@@ -201,12 +201,12 @@ The dominant cost in all programs is the O(n² × max_m) dynamic programming ste
 
 The piecewise-constant correlation changepoint model is based on:
 
-- Galeano, P. and Wied, D. (2014). Multiple break detection in the correlation structure of random variables. *Computational Statistics & Data Analysis*, 76, 262–282.
+- Galeano, P. and Wied, D. (2014). [Multiple break detection in the correlation structure of random variables](https://arxiv.org/abs/1206.5367). *Computational Statistics & Data Analysis*, 76, 262–282.
 
 BIC for changepoint models:
 
-- Yao, Y.-C. (1988). Estimating the number of change-points via Schwarz criterion. *Statistics & Probability Letters*, 6(3), 181–189.
+- Yao, Y.-C. (1988). [Estimating the number of change-points via Schwarz criterion](https://www.sciencedirect.com/science/article/abs/pii/0167715288901186). *Statistics & Probability Letters*, 6(3), 181–189.
 
 Continuous piecewise-linear fitting:
 
-- Bellman, R. and Roth, R. (1969). Curve fitting by segmented straight lines. *Journal of the American Statistical Association*, 64(327), 1079–1084.
+- Bellman, R. and Roth, R. (1969). [Curve fitting by segmented straight lines](https://www.tandfonline.com/doi/pdf/10.1080/01621459.1969.10501038). *Journal of the American Statistical Association*, 64(327), 1079–1084.
