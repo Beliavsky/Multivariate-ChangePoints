@@ -5,7 +5,8 @@ implicit none
 private
 public :: default, assert_equal, write_merge, split_string, display, &
    print_time_elapsed, print_wall_time, read_words_line, str, print_table, exe_name, &
-   join, seq, cbind, sort_int, set_segment_values
+   join, seq, cbind, sort_int, set_segment_values, next_combination, n_choose_k, &
+   cumul_sum, print_square_matrix
 interface default
    module procedure default_int, default_real, default_logical, &
       default_character
@@ -22,7 +23,7 @@ end interface display
 contains
 
     !> Creates a time series by mapping segments to values defined by changepoints.
-    function set_segment_values(n, changepoints, values) result(series)
+    pure function set_segment_values(n, changepoints, values) result(series)
         integer, intent(in) :: n                   ! Length of the time series
         integer, intent(in) :: changepoints(:)     ! Changepoint indices
         real(kind=dp), intent(in) :: values(:)     ! Values per segment
@@ -42,7 +43,7 @@ contains
         end do
     end function set_segment_values
 
-subroutine sort_int(arr)
+pure subroutine sort_int(arr)
     ! Sorts an integer array in ascending order using a simple bubble sort
     integer, intent(in out) :: arr(:)
     integer :: n, i, j, temp
@@ -131,7 +132,7 @@ else
 end if
 end subroutine write_merge
 
-subroutine split_string(str, delim, tokens)
+pure subroutine split_string(str, delim, tokens)
 character(len=*), intent(in)           :: str
 character(len=*), intent(in)           :: delim
 character(:), allocatable, intent(out) :: tokens(:)
@@ -245,7 +246,7 @@ if (ierr /= 0) then
 end if
 end subroutine read_words_line
 
-function str(i) result(text)
+pure function str(i) result(text)
 integer, intent(in) :: i
 character (len=20) :: text
 write (text,"(i0)") i
@@ -282,7 +283,7 @@ call get_command_argument(0,xname)
 xname = trim(xname)
 end function exe_name
 
-function join(words,sep) result(str)
+pure function join(words,sep) result(str)
 character (len=*), intent(in)                                   :: words(:),sep
 character (len=(size(words)-1)*len(sep) + sum(len_trim(words))) :: str
 integer                                                         :: i,nw
@@ -353,5 +354,63 @@ allocate (xy(n1, n2+size(y,2)))
 xy(:,:n2)  = x
 xy(:,n2+1:) = y 
 end function cbind_mat_mat
+
+pure subroutine next_combination(combo, n)
+    !> Advance combo(:) to the next k-combination of {1..n} in lexicographic order.
+    !> If combo is already the last combination it is left unchanged.
+    integer, intent(in out) :: combo(:)
+    integer, intent(in)     :: n
+    integer :: k, i, j
+    k = size(combo)
+    i = k
+    do while (i >= 1 .and. combo(i) == n - k + i)
+        i = i - 1
+    end do
+    if (i < 1) return
+    combo(i) = combo(i) + 1
+    combo(i+1:k) = [(combo(i) + j, j = 1, k - i)]
+end subroutine next_combination
+
+pure function n_choose_k(n, k) result(c)
+    !> Return the binomial coefficient C(n, k).
+    integer, intent(in) :: n, k
+    integer :: c, i
+    if (k < 0 .or. k > n) then
+        c = 0
+        return
+    end if
+    c = 1
+    do i = 1, min(k, n - k)
+        c = c * (n - i + 1) / i
+    end do
+end function n_choose_k
+
+function cumul_sum(x) result(xcumul)
+real(kind=dp), intent(in) :: x(:)
+real(kind=dp)             :: xcumul(size(x))
+integer                   :: i, n
+n = size(x)
+if (n < 1) return
+xcumul(1) = x(1)
+do i=2,n
+   xcumul(i) = xcumul(i-1) + x(i)
+end do
+end function cumul_sum
+
+subroutine print_square_matrix(x, labels, title, outu)
+    !> Print a labeled matrix with an optional title.
+    !> Row and column labels are taken from labels(:); x must be square.
+    real(kind=dp), intent(in)    :: x(:,:)
+    character(len=*), intent(in) :: labels(:)
+    character(len=*), intent(in), optional :: title
+    integer, intent(in), optional :: outu
+    integer :: i, outu_
+    outu_ = default(output_unit, outu)
+    if (present(title)) write (outu_, "(/,a)") title
+    write (outu_, "(12x,*(a11))") (trim(labels(i)), i=1,size(labels))
+    do i = 1, size(x, 1)
+        write (outu_, "(a12,*(1x,f10.4))") trim(labels(i)), x(i,:)
+    end do
+end subroutine print_square_matrix
 
 end module util_mod
