@@ -592,9 +592,6 @@ do i = 1, len(str)
 end do
 end function str_lower
 
-
-
-
 pure function irow(df, ivec) result(df_new)
 ! returns a dataframe with the subset of columns in ivec(:)
 class(DataFrame_index_date), intent(in) :: df
@@ -1263,54 +1260,84 @@ else
 end if
 end function shift
 
-pure function pct_change(self, periods) result(df_new)
+pure function pct_change(self, periods, dropna) result(df_new)
 ! percent change (simple return) over 'periods' rows.
+! If dropna=.true., the first 'periods' NaN rows are dropped from the result.
 class(DataFrame_index_date), intent(in) :: self
 integer, intent(in), optional :: periods
+logical, intent(in), optional :: dropna
 type(DataFrame_index_date) :: df_new
 type(DataFrame_index_date) :: lag
 integer :: p, nr, nc
+logical :: drop
 
-p = default(1, periods)
-lag = self%shift(p)  ! default fill is NaN
+p    = default(1, periods)
+drop = .false.
+if (present(dropna)) drop = dropna
+lag  = self%shift(p)  ! default fill is NaN
 
-df_new%index = self%index
-df_new%columns = self%columns
 nr = nrow(self)
 nc = ncol(self)
-allocate(df_new%values(nr, nc))
-if (nr == 0 .or. nc == 0) return
-
-df_new%values = self%values/lag%values - 1.0_dp
+df_new%columns = self%columns
+if (drop) then
+   df_new%index = self%index(p+1:nr)
+   allocate(df_new%values(nr - p, nc))
+   if (nr > p .and. nc > 0) &
+      df_new%values = self%values(p+1:nr,:) / lag%values(p+1:nr,:) - 1.0_dp
+else
+   df_new%index = self%index
+   allocate(df_new%values(nr, nc))
+   if (nr == 0 .or. nc == 0) return
+   df_new%values = self%values/lag%values - 1.0_dp
+end if
 end function pct_change
 
-pure function log_change(self, periods) result(df_new)
+pure function log_change(self, periods, dropna) result(df_new)
 ! log change (log return) over 'periods' rows: ln(x(t)/x(t-periods)).
+! If dropna=.true., the first 'periods' NaN rows are dropped from the result.
 class(DataFrame_index_date), intent(in) :: self
 integer, intent(in), optional :: periods
+logical, intent(in), optional :: dropna
 type(DataFrame_index_date) :: df_new
 type(DataFrame_index_date) :: lag
-integer :: p, nr, nc
+integer :: p, nr, nc, nr_out, i0
 real(kind=dp), allocatable :: ratio(:,:)
 real(kind=dp) :: nan
+logical :: drop
 
-p = default(1, periods)
-lag = self%shift(p)  ! default fill is NaN
+p    = default(1, periods)
+drop = .false.
+if (present(dropna)) drop = dropna
+lag  = self%shift(p)  ! default fill is NaN
 
-df_new%index = self%index
+nr     = nrow(self)
+nc     = ncol(self)
+nan    = ieee_value(0.0_dp, ieee_quiet_nan)
 df_new%columns = self%columns
-nr = nrow(self)
-nc = ncol(self)
-allocate(df_new%values(nr, nc))
-nan = ieee_value(0.0_dp, ieee_quiet_nan)
-df_new%values = nan
-if (nr == 0 .or. nc == 0) return
-
-allocate(ratio(nr, nc))
-ratio = self%values/lag%values
-where (ratio > 0.0_dp .and. .not. ieee_is_nan(ratio))
-   df_new%values = log(ratio)
-end where
+if (drop) then
+   i0    = p + 1
+   nr_out = nr - p
+   df_new%index = self%index(i0:nr)
+   allocate(df_new%values(nr_out, nc))
+   df_new%values = nan
+   if (nr_out > 0 .and. nc > 0) then
+      allocate(ratio(nr_out, nc))
+      ratio = self%values(i0:nr,:) / lag%values(i0:nr,:)
+      where (ratio > 0.0_dp .and. .not. ieee_is_nan(ratio))
+         df_new%values = log(ratio)
+      end where
+   end if
+else
+   df_new%index = self%index
+   allocate(df_new%values(nr, nc))
+   df_new%values = nan
+   if (nr == 0 .or. nc == 0) return
+   allocate(ratio(nr, nc))
+   ratio = self%values/lag%values
+   where (ratio > 0.0_dp .and. .not. ieee_is_nan(ratio))
+      df_new%values = log(ratio)
+   end where
+end if
 end function log_change
 
 pure function reindex(self, new_index, method, fill_value) result(df_new)

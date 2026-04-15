@@ -8,8 +8,8 @@ module io_utils_mod
     public :: print_true_params, print_model_selection, print_estimated_parameters, &
               print_estimated_parameters_dates, print_corrmat_segment, print_corrmat_diff, &
               corrmat_model_range, print_corrmat_model, keep_obs, &
-              print_univar_segments, print_covmat_model, print_pca_loadings, &
-              print_lower_corr_sd, print_covmat_segment
+              print_univar_segments, print_return_segments, print_covmat_model, &
+              print_pca_loadings, print_lower_corr_sd, print_covmat_segment
 
 contains
 
@@ -72,7 +72,7 @@ contains
         n = size(dp_table, 1)
         max_m = size(dp_table, 2)
 
-        if (print_each_) print "(/,a)", "M      LL         AIC         BIC    ChangePoints"
+        if (print_each_) print "(/,a)", "   M      LL         AIC         BIC    ChangePoints"
         do m = 1, max_m
             if (dp_table(n, m) >= 1.0e19_dp) then
                 aic(m) = 1.0e20_dp
@@ -84,7 +84,7 @@ contains
             aic(m) = -2.0_dp*ll + 2.0_dp * k_params
             bic(m) = -2.0_dp*ll + real(k_params, dp) * log(real(n, dp))
 
-            if (print_each_) write(*, "(i2, 3f12.2, 4x)", advance='no') &
+            if (print_each_) write(*, "(i4, 3f12.2, 4x)", advance='no') &
                m, ll, aic(m), bic(m)
             cp = n
             cps(m) = n
@@ -453,7 +453,7 @@ contains
     end subroutine keep_obs
 
     subroutine print_univar_segments(best_bic, seg_ends, z, series_name, ret_dates)
-        !> Print segment means and standard deviations for a univariate series z.
+        !> Print segment statistics (mean, sd, min, max, first, last) for a univariate series z.
         integer, intent(in)          :: best_bic, seg_ends(:)
         real(kind=dp), intent(in)    :: z(:)
         character(len=*), intent(in) :: series_name, ret_dates(:)
@@ -465,7 +465,7 @@ contains
         else
             print "(/,'model (',i0,' changepoint(s)) -- ',a)", ms - 1, series_name
         end if
-        print "(a12,a12,a8,a12,a12)", "start", "end", "n", "mean", "sd"
+        print "(a12,a12,a8,6a12)", "start", "end", "n", "mean", "sd", "min", "max", "first", "last"
         i0 = 1
         do k = 1, ms
             i1 = seg_ends(k)
@@ -476,10 +476,49 @@ contains
             else
                 zsd = 0.0_dp
             end if
-            print "(a12,a12,i8,2f12.4)", ret_dates(i0), ret_dates(i1), nseg, zmean, zsd
+            print "(a12,a12,i8,6f12.4)", ret_dates(i0), ret_dates(i1), nseg, &
+                zmean, zsd, minval(z(i0:i1)), maxval(z(i0:i1)), z(i0), z(i1)
             i0 = i1 + 1
         end do
     end subroutine print_univar_segments
+
+    subroutine print_return_segments(best_bic, seg_ends, r, series_name, ret_dates, scale_ret)
+        !> Print annualised return and volatility for each segment of a variance
+        !! changepoint model.  r(:) are the raw (scaled) returns for one asset.
+        !! Annualised return  = mean(r) * 252 / scale_ret
+        !! Annualised vol     = sqrt(mean(r^2) * 252) / scale_ret
+        integer,          intent(in) :: best_bic, seg_ends(:)
+        real(kind=dp),    intent(in) :: r(:), scale_ret
+        character(len=*), intent(in) :: series_name, ret_dates(:)
+        real(kind=dp), parameter :: days_per_year = 252.0_dp
+        integer       :: ms, k, i0, i1, nseg
+        real(kind=dp) :: ann_ret, ann_vol, rmin, rmax, rfirst, rlast, sc
+        ms = size(seg_ends)
+        sc = 100.0_dp / scale_ret   ! converts stored units to percent
+        if (ms == best_bic + 1) then
+            print "(/,'BIC-selected model (',i0,' changepoint(s)) -- ',a)", best_bic, series_name
+        else
+            print "(/,'model (',i0,' changepoint(s)) -- ',a)", ms - 1, series_name
+        end if
+        ! r is in units of scale_ret (e.g. percent when scale_ret=100)
+        ! Divide once by scale_ret to get actual returns, then express as %
+        print "(a12,a12,a8,a12,a12,a10,a10,a10,a10)", &
+            "start", "end", "n", "ann_ret%", "ann_vol%", "min%", "max%", "first%", "last%"
+        i0 = 1
+        do k = 1, ms
+            i1     = seg_ends(k)
+            nseg   = i1 - i0 + 1
+            ann_ret = sum(r(i0:i1)) / nseg * days_per_year * sc
+            ann_vol = sqrt(sum(r(i0:i1)**2) / nseg * days_per_year) * sc
+            rmin   = minval(r(i0:i1)) * sc
+            rmax   = maxval(r(i0:i1)) * sc
+            rfirst = r(i0) * sc
+            rlast  = r(i1) * sc
+            print "(a12,a12,i8,2f12.2,4f10.2)", &
+                ret_dates(i0), ret_dates(i1), nseg, ann_ret, ann_vol, rmin, rmax, rfirst, rlast
+            i0 = i1 + 1
+        end do
+    end subroutine print_return_segments
 
     subroutine print_covmat_model(best_bic, seg_ends, R, col_names, ret_dates)
         !> Print annualized covariance matrix (x252) for each segment.

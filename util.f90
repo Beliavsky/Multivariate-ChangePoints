@@ -6,7 +6,7 @@ private
 public :: default, assert_equal, write_merge, split_string, display, &
    print_time_elapsed, print_wall_time, read_words_line, str, print_table, exe_name, &
    join, seq, cbind, sort_int, set_segment_values, next_combination, n_choose_k, &
-   cumul_sum, print_square_matrix
+   cumul_sum, print_square_matrix, read_matrix
 interface default
    module procedure default_int, default_real, default_logical, &
       default_character
@@ -412,5 +412,62 @@ subroutine print_square_matrix(x, labels, title, outu)
         write (outu_, "(a12,*(1x,f10.4))") trim(labels(i)), x(i,:)
     end do
 end subroutine print_square_matrix
+
+subroutine read_matrix(filename, x, nrow_max, ncol_max)
+    !> Read a matrix from a text file.
+    !> Format: first line "# nrow ncol ..." (nrow and ncol are the first two integers),
+    !> followed by any number of additional comment lines beginning with '#',
+    !> followed by nrow rows each containing ncol whitespace-separated reals.
+    !> If nrow_max is present, at most nrow_max rows are read.
+    !> If ncol_max is present, at most ncol_max columns are read.
+    character(len=*), intent(in) :: filename
+    real(kind=dp), allocatable, intent(out) :: x(:,:)
+    integer, intent(in), optional :: nrow_max, ncol_max
+    integer :: unit, ios, i, nrow, ncol, nrow_rd, ncol_rd
+    real(kind=dp), allocatable :: row_buf(:)
+    character(len=1024) :: line
+    open(newunit=unit, file=filename, status='old', action='read', iostat=ios)
+    if (ios /= 0) then
+        print "(a)", "read_matrix: cannot open '" // trim(filename) // "'"
+        error stop
+    end if
+    read(unit, '(a)') line          ! first line: # nrow ncol ...
+    read(line(2:), *, iostat=ios) nrow, ncol
+    if (ios /= 0) then
+        print "(a)", "read_matrix: cannot parse nrow/ncol from: " // trim(line)
+        error stop
+    end if
+    do                               ! skip remaining comment lines
+        read(unit, '(a)', iostat=ios) line
+        if (ios /= 0) exit
+        if (line(1:1) /= '#') then
+            backspace(unit)
+            exit
+        end if
+    end do
+    nrow_rd = nrow;  if (present(nrow_max)) nrow_rd = min(nrow_rd, nrow_max)
+    ncol_rd = ncol;  if (present(ncol_max)) ncol_rd = min(ncol_rd, ncol_max)
+    allocate(x(nrow_rd, ncol_rd))
+    if (ncol_rd < ncol) then
+        allocate(row_buf(ncol))
+        do i = 1, nrow_rd
+            read(unit, *, iostat=ios) row_buf
+            if (ios /= 0) then
+                print "(a,i0)", "read_matrix: error reading row ", i
+                error stop
+            end if
+            x(i, :) = row_buf(1:ncol_rd)
+        end do
+    else
+        do i = 1, nrow_rd
+            read(unit, *, iostat=ios) x(i, :)
+            if (ios /= 0) then
+                print "(a,i0)", "read_matrix: error reading row ", i
+                error stop
+            end if
+        end do
+    end if
+    close(unit)
+end subroutine read_matrix
 
 end module util_mod

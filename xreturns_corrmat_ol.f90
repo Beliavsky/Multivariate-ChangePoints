@@ -36,12 +36,13 @@ program xreturns_corrmat_ol
     real(kind=dp), parameter :: ewma_lambda = 0.94_dp    ! EWMA decay factor (RiskMetrics daily default)
     integer,       parameter :: step  = 63                ! re-run every step obs (~1 quarter)
     integer,       parameter :: min_n = 2 * min_seg_len  ! minimum obs before first run
+    logical,       parameter :: resample_ret = .false.   ! .true. = shuffle rows (null hypothesis check)
 
     integer :: n, n_col, pps, best_bic, t, j
     real(kind=dp), allocatable :: dp_table_t(:,:), R(:,:), R_std(:,:)
     integer,       allocatable :: parent_t(:,:), cp_ends(:)
     integer(kind=long_int) :: t_start
-    character(len=10), allocatable :: date_labels(:), ret_dates(:)
+    character(len=10), allocatable :: ret_dates(:)
 
     call system_clock(t_start)
 
@@ -50,15 +51,18 @@ program xreturns_corrmat_ol
     print "(*(1x,a,1x,i0))", "read", nrow(df_px), "days and", ncol(df_px), &
         "columns from " // trim(prices_file)
     if (max_days > 0) call keep_obs(df_px, max_days, latest, verbose=.true.)
-    df_ret = scale_ret * df_px%pct_change()
+    df_ret = scale_ret * df_px%pct_change(dropna=.true.)
+    if (resample_ret) then
+        df_ret = df_ret%resample()
+        print *, "resampled returns!"
+    end if
 
-    n     = size(df_ret%values, 1) - 1
+    n     = size(df_ret%values, 1)
     n_col = ncol(df_ret)
     pps   = n_col * (n_col + 1) / 2 + 1  ! params per segment: p*(p+1)/2 correlations + 1 location
 
-    date_labels = df_ret%index%to_str()
-    ret_dates   = date_labels(2:n+1)
-    R           = df_ret%values(2:, :)
+    ret_dates = df_ret%index%to_str()
+    R         = df_ret%values
     R_std       = standardize_returns(R, use_ewma, ewma_lambda)
 
     print "(/,a)", "Online changepoint detection (expanding window)"
