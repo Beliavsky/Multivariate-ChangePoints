@@ -1,4 +1,4 @@
-exec = xcorr_sim xcovar_sim xcorr_fit xreturns_corr_cp xreturns_cov_cp xreturns_covmat_cp xreturns_corrmat_cp xreturns_variance_cp xreturns_mean_cp xreturns_variance_pwl xreturns_variance_pwl_fast xreturns_corrsub_cp xreturns_pca xreturns_corrmat_ol
+exec = xcorr_sim xcovar_sim xcorr_fit xreturns_corr_cp xreturns_cov_cp xreturns_covmat_cp xreturns_corrmat_cp xreturns_variance_cp xreturns_mean_cp xreturns_mean_variance_cp xreturns_variance_pwl xreturns_variance_pwl_fast xreturns_corrsub_cp xreturns_pca xreturns_corrmat_ol xresample_cp xsim_variance_cp xdata_mean_variance_cp
 FC   = gfortran
 opt  = -O3 -Wall -static -g
 
@@ -145,7 +145,51 @@ xreturns_corrmat_ol.o: xreturns_corrmat_ol.f90 kind.o util.o basic_stats.o chang
 xreturns_corrmat_ol: $(obj_corrmat_ol)
 	$(FC) $(opt) -o xreturns_corrmat_ol $(obj_corrmat_ol)
 
-run: run_sim run_covar_sim run_fit run_corr run_cov run_covmat run_corrmat run_var run_mean run_var_pwl run_var_pwl_fast run_corrsub run_pca run_corrmat_ol
+obj_mean_var = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_mean_variance_cp.o
+
+xreturns_mean_variance_cp.o: xreturns_mean_variance_cp.f90 kind.o util.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+	$(FC) $(opt) -c xreturns_mean_variance_cp.f90
+
+xreturns_mean_variance_cp: $(obj_mean_var)
+	$(FC) $(opt) -o xreturns_mean_variance_cp $(obj_mean_var)
+
+run_mean_var: xreturns_mean_variance_cp
+	./xreturns_mean_variance_cp
+
+obj_resample_cp = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xresample_cp.o
+
+xresample_cp.o: xresample_cp.f90 kind.o util.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+	$(FC) $(opt) -c xresample_cp.f90
+
+xresample_cp: $(obj_resample_cp)
+	$(FC) $(opt) -o xresample_cp $(obj_resample_cp)
+
+run_resample_cp: xresample_cp
+	./xresample_cp
+
+obj_sim_var_cp = kind.o util.o changepoint.o xsim_variance_cp.o
+
+xsim_variance_cp.o: xsim_variance_cp.f90 kind.o util.o changepoint.o
+	$(FC) $(opt) -c xsim_variance_cp.f90
+
+xsim_variance_cp: $(obj_sim_var_cp)
+	$(FC) $(opt) -o xsim_variance_cp $(obj_sim_var_cp)
+
+run_sim_var_cp: xsim_variance_cp
+	./xsim_variance_cp
+
+obj_data_mean_var_cp = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xdata_mean_variance_cp.o
+
+xdata_mean_variance_cp.o: xdata_mean_variance_cp.f90 kind.o util.o changepoint.o io_utils.o
+	$(FC) $(opt) -c xdata_mean_variance_cp.f90
+
+xdata_mean_variance_cp: $(obj_data_mean_var_cp)
+	$(FC) $(opt) -o xdata_mean_variance_cp $(obj_data_mean_var_cp)
+
+run_data_mean_var_cp: xdata_mean_variance_cp
+	./xdata_mean_variance_cp
+
+run: run_sim run_covar_sim run_fit run_corr run_cov run_covmat run_corrmat run_var run_mean run_mean_var run_var_pwl run_var_pwl_fast run_corrsub run_pca run_corrmat_ol run_resample_cp run_sim_var_cp run_data_mean_var_cp
 
 run_sim: xcorr_sim
 	./xcorr_sim
