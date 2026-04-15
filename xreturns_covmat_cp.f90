@@ -38,14 +38,15 @@ program xreturns_covmat_cp
     real(kind=dp), parameter :: scale_ret = 100.0_dp
     integer, parameter :: max_days = 0     ! 0 = use all returns
     logical, parameter :: latest  = .true. ! if max_days>0: .true.=latest, .false.=earliest
-    logical, parameter :: print_pca = .true.
+    logical, parameter :: print_pca     = .true.
+    logical, parameter :: resample_ret  = .false.  ! .true. = shuffle rows (null hypothesis check)
 
     integer :: n, n_col, k, pps, best_aic, best_bic, m_segs, seg_start, cp_idx
     integer, allocatable :: seg_ends(:)
     real(kind=dp), allocatable :: dp_table(:,:), R(:,:)
     integer, allocatable :: parent(:,:)
     integer(kind=long_int) :: t_start
-    character(len=10), allocatable :: date_labels(:), ret_dates(:)
+    character(len=10), allocatable :: ret_dates(:)
 
     call system_clock(t_start)
 
@@ -59,20 +60,21 @@ program xreturns_covmat_cp
             merge('latest  ','earliest', latest), nrow(df_px) - 1, &
             trim(df_px%index(2)%to_str()), trim(df_px%index(nrow(df_px))%to_str())
     end if
-    df_ret = scale_ret * df_px%pct_change()
+    df_ret = scale_ret * df_px%pct_change(dropna=.true.)
     if (scale_ret /= 1.0_dp) print "('return scaling: ', f0.4)", scale_ret
+    if (resample_ret) then
+        df_ret = df_ret%resample()
+        print *, "resampled returns!"
+    end if
 
-    n     = size(df_ret%values, 1) - 1
+    n     = size(df_ret%values, 1)
     n_col = ncol(df_ret)
 
-    ! ret_dates(i) is the date of return i (1-indexed), skipping the NaN first row
-    date_labels = df_ret%index%to_str()
-    allocate(ret_dates(n))
-    ret_dates = date_labels(2:n+1)
+    ret_dates = df_ret%index%to_str()
 
     ! R(i, a) = return of asset a on day i
     allocate(R(n, n_col))
-    R = df_ret%values(2:, :)
+    R = df_ret%values
 
     ! ── cost matrix and DP ───────────────────────────────────────────────────────
     print "(/,'building ',i0,'x',i0,' joint cost matrix for ',i0,' assets...')", n, n, n_col

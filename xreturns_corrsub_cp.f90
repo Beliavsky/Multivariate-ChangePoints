@@ -48,13 +48,14 @@ program xreturns_corrsub_cp
     logical, parameter  :: do_variance = .true.
     logical, parameter  :: do_cov      = .true.
     logical, parameter  :: do_corr     = .true.
+    logical, parameter  :: resample_ret = .false.  ! .true. = shuffle rows (null hypothesis check)
 
     integer :: n, n_col, j, ks, k, n_total, n_limit, n_sub, pps, m_lo, m_hi, ms, best_bic_sub
     integer, allocatable :: combo(:), cp_aic(:), cp_bic(:), seg_ends(:)
     real(kind=dp), allocatable :: dp_table(:,:), R(:,:), R_std(:,:)
     integer, allocatable :: parent(:,:)
     integer(kind=long_int) :: t_start
-    character(len=10), allocatable :: ret_dates(:), date_labels(:)
+    character(len=10), allocatable :: ret_dates(:)
 
     call system_clock(t_start)
 
@@ -63,14 +64,17 @@ program xreturns_corrsub_cp
     print "(*(1x,a,1x,i0))", "read", nrow(df_px), "days and", ncol(df_px), &
         "columns from " // trim(prices_file)
     if (max_days > 0) call keep_obs(df_px, max_days, latest, verbose=.true.)
-    df_ret = scale_ret * df_px%pct_change()
+    df_ret = scale_ret * df_px%pct_change(dropna=.true.)
     if (scale_ret /= 1.0_dp) print "('return scaling: ', f0.4)", scale_ret
+    if (resample_ret) then
+        df_ret = df_ret%resample()
+        print *, "resampled returns!"
+    end if
 
-    n     = size(df_ret%values, 1) - 1
+    n     = size(df_ret%values, 1)
     n_col = ncol(df_ret)
-    date_labels = df_ret%index%to_str()
-    ret_dates   = date_labels(2:n+1)
-    R           = df_ret%values(2:, :)
+    ret_dates = df_ret%index%to_str()
+    R         = df_ret%values
 
     allocate(dp_table(n, max_m), parent(n, max_m), seg_ends(max_m))
 

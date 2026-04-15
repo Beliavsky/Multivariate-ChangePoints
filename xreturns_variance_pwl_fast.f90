@@ -33,9 +33,10 @@ program xreturns_variance_pwl_fast
         sym_allowed(*) = [character(len=5) ::]
     real(kind=dp), parameter :: scale_ret = 100.0_dp
     real(kind=dp), parameter :: min_var = 1.0e-8_dp
-    logical, parameter :: print_param = .false.
-    integer, parameter :: max_days = 260
-    logical, parameter :: latest = .true.
+    logical, parameter :: print_param  = .false.
+    integer, parameter :: max_days     = 260
+    logical, parameter :: latest       = .true.
+    logical, parameter :: resample_ret = .false.  ! .true. = shuffle rows (null hypothesis check)
 
     integer :: n, n_col, j, max_cp_eff, best_aic_m, best_bic_m, n_models_fitted
     real(kind=dp), allocatable :: r(:), ll(:), aic(:), bic(:)
@@ -53,15 +54,16 @@ program xreturns_variance_pwl_fast
 
     if (max_days > 0) then
         df_px = df_px%keep_rows(max_days + 1, latest=latest)
-        print '(''using '',a,'' '',i0,'' returns ('',a,'' to '',a,'')'')', &
-            merge('latest  ','earliest', latest), nrow(df_px) - 1, &
-            trim(df_px%index(2)%to_str()), trim(df_px%index(nrow(df_px))%to_str())
     end if
 
-    df_ret = scale_ret * df_px%pct_change()
+    df_ret = scale_ret * df_px%pct_change(dropna=.true.)
     if (scale_ret /= 1.0_dp) print '(''return scaling: '', f0.4)', scale_ret
+    if (resample_ret) then
+        df_ret = df_ret%resample()
+        print *, "resampled returns!"
+    end if
 
-    n = size(df_ret%values, 1) - 1
+    n = size(df_ret%values, 1)
     n_col = ncol(df_ret)
     max_cp_eff = min(max_cp, max(0, n / min_seg_len - 1))
 
@@ -80,12 +82,12 @@ program xreturns_variance_pwl_fast
     if (print_param) then
         allocate(date_labels(n))
         do j = 1, n
-            date_labels(j) = df_px%index(j + 1)%to_str()
+            date_labels(j) = df_ret%index(j)%to_str()
         end do
     end if
 
     do j = 1, n_col
-        r = df_ret%values(2:, j)
+        r = df_ret%values(:, j)
 
         print '(/,a)', 'continuous piecewise linear variance of ' // trim(df_ret%columns(j))
 
