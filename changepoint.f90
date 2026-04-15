@@ -1,9 +1,10 @@
 module changepoint_mod
     use kind_mod, only: dp
+    use util_mod, only: sort_int
     implicit none
     private
     public :: log_likelihood_corr, cost_matrix, cost_matrix_slow, mean_shift_cost_matrix, &
-              multivar_cost_matrix, solve_changepoints
+              multivar_cost_matrix, solve_changepoints, segment_ends
     public :: solve_continuous_pwl_sse, fit_continuous_pwl_given_cps
 
     type :: quad_state
@@ -754,5 +755,22 @@ contains
 
         deallocate(aa, bb, rowtmp)
     end subroutine solve_linear_system
+
+    pure function segment_ends(parent, ms) result(seg_ends)
+        !> Backtrack through the DP parent table to recover the ms segment end-points,
+        !! then sort into ascending order.
+        integer, intent(in) :: parent(:,:)
+        integer, intent(in) :: ms
+        integer :: seg_ends(ms)
+        integer :: n, k, cp_idx
+        n            = size(parent, 1)
+        cp_idx       = n
+        seg_ends(ms) = n
+        do k = ms, 2, -1
+            seg_ends(k-1) = parent(cp_idx, k)
+            cp_idx        = seg_ends(k-1)
+        end do
+        if (ms > 1) call sort_int(seg_ends(1:ms-1))
+    end function segment_ends
 
 end module changepoint_mod
