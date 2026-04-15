@@ -1,6 +1,6 @@
 # Multivariate-ChangePoints
 
-Fortran programs (with Python and C++ equivalents for the main program) that find structural breaks in the mean, variance, correlation, and covariance of financial return series using exact dynamic programming.
+Fortran programs (with Python and C++ equivalents for selected programs) that find structural breaks in the mean, variance, correlation, and covariance of financial return series — and in generic univariate data — using exact dynamic programming.
 
 Two sample data files are included:
 
@@ -41,7 +41,8 @@ in O(n² × max_m) time, then select the number of segments by AIC and BIC.  The
 |---------|-----------|------------|----------------|
 | correlation | bivariate (x, y) | m/2 · log(1 − r²) | 1 (one ρ) |
 | mean | r_t | m/2 · log(ŝ²_z) | 2 (μ, σ²) |
-| variance | r_t² | m/2 · log(ŝ²_z) | 2 |
+| variance (r²) | r_t² | m/2 · log(ŝ²_z) | 2 |
+| variance (log) | log(c + r_t²) | m/2 · log(ŝ²_z) | 2 |
 | pairwise covariance | r_{i,t} · r_{j,t} | m/2 · log(ŝ²_z) | 2 |
 | joint covariance matrix | R_t ∈ ℝᵖ | m/2 · log\|Σ̂\| | p(p+3)/2 + 1 |
 | joint correlation matrix | R_t ∈ ℝᵖ (standardised) | m/2 · log\|Ρ̂\| | p(p+1)/2 + 1 |
@@ -49,6 +50,13 @@ in O(n² × max_m) time, then select the number of segments by AIC and BIC.  The
 where ŝ²_z = mean(z²) − mean(z)² is the biased sample variance of z over the segment, Σ̂ is the biased sample covariance matrix, and Ρ̂ is the sample correlation matrix of standardised returns.  The joint covariance and correlation matrix costs use a Cholesky-based log-determinant.
 
 The BIC penalty is `k_params × log(n)` where `k_params = params_per_seg × m − 1` (one parameter per segment times m segments, minus one for the first segment which has no preceding changepoint location).
+
+### Variance series: r² vs log(c + r²)
+
+Two choices are available for the variance series (controlled by `use_log_var`):
+
+- **z_t = r_t²** finds good changepoint locations but the series is non-negative and heavy-tailed (chi-squared), so BIC under-penalises splits and bootstrap-resampled (i.i.d.) data can yield *more* detected changepoints than the original — an inverted null test.
+- **z_t = log(c + r_t²)** is approximately Gaussian (log-chi-squared), giving a correctly calibrated BIC and a proper null test under resampling.  The offset `c` (default 0.01 for percent returns) floors near-zero returns.
 
 ---
 
@@ -95,10 +103,13 @@ Fits the correlation changepoint model to a single pair with detailed diagnostic
 ### Variance and mean changepoints (univariate, per asset)
 
 **`xreturns_variance_cp.f90`**  
-Finds changepoints in the variance of each asset independently.  The derived series is z_t = r_t², and the cost is the profile normal mean-shift log-likelihood m/2 · log(ŝ²_z).  Prints a summary table of BIC/AIC changepoint counts per asset.
+Finds changepoints in the variance of each asset independently.  The derived series is z_t = r_t², and the cost is the profile normal mean-shift log-likelihood m/2 · log(ŝ²_z).  Prints a summary table of BIC/AIC changepoint counts per asset.  Set `resample_ret = .true.` to shuffle rows as a null-hypothesis check.
 
 **`xreturns_mean_cp.f90`**  
-Finds changepoints in the return mean of each asset.  Same cost function, with z_t = r_t.
+Finds changepoints in the return mean of each asset.  Same cost function, with z_t = r_t.  Supports `resample_ret`.
+
+**`xreturns_mean_variance_cp.f90`**  
+Runs both mean and variance changepoint analyses for each asset in one pass.  The variance series is selectable via `use_log_var` / `var_offset`; see the variance series note above.  Supports `resample_ret`.
 
 **`xreturns_variance_pwl.f90`**  
 Fits a **continuous piecewise-linear** path to squared returns by minimising the sum of squared residuals.  The fitted variance path v_t is continuous at the knots (changepoints) and linear between them.  This is an exact optimizer for the PWL-SSE objective, not a likelihood model.
@@ -135,7 +146,7 @@ Segment 2: 2008-09-02 to 2012-06-29 (984 obs)
 
 `*SD*` is the annualised standard deviation (× √252) of unscaled returns.
 
-Prefix sums of outer products (`SR`, `SP`) reduce cost matrix construction to O(n · p²) setup + O(n² · p²) inner work, with an O(p³) Cholesky per cell.
+Prefix sums of outer products (`SR`, `SP`) reduce cost matrix construction to O(n · p²) setup + O(n² · p²) inner work, with an O(p³) Cholesky per cell.  Supports `resample_ret`.
 
 **`xcovar_sim.f90`**  
 Simulation counterpart of `xreturns_covmat_cp.f90`.  Generates a p × n multivariate normal series with known piecewise-constant covariance matrices (specified as correlations + standard deviations per segment), runs the joint covariance changepoint algorithm, and prints true vs estimated parameters side by side.
@@ -165,6 +176,7 @@ Additional output options (compile-time parameters):
 | `alpha_diff` | 0.05 | Significance level for the Fisher z-test |
 | `print_pca_cov` | `.false.` | PCA of segment covariance matrix |
 | `print_pca_corr` | `.true.` | PCA of segment correlation matrix |
+| `resample_ret` | `.false.` | Shuffle rows as a null-hypothesis check |
 
 **`xreturns_corrmat_ol.f90`**  
 **Online (expanding-window)** version of `xreturns_corrmat_cp.f90`.  At each step t the DP is re-run on data 1:t only, so no future data are used.  Prints a dated table showing how the BIC-optimal changepoint dates evolve as new observations arrive:
@@ -178,7 +190,7 @@ as-of          n_cp  changepoints
 ...
 ```
 
-The DP is re-run every `step` observations (default 63, ≈ 1 quarter).  Total work scales as O(n³/step).
+The DP is re-run every `step` observations (default 63, ≈ 1 quarter).  Total work scales as O(n³/step).  Supports `resample_ret`.
 
 **`xreturns_corrsub_cp.f90`**  
 Runs up to four changepoint algorithms across all distinct asset subsets of specified sizes, controlled by compile-time toggles:
@@ -190,7 +202,87 @@ Runs up to four changepoint algorithms across all distinct asset subsets of spec
 | `do_cov` | Joint covariance-matrix changepoints for each subset |
 | `do_corr` | Joint correlation-matrix changepoints for each subset (EWMA-standardised) |
 
-`sub_sizes` specifies the subset sizes to analyse (default `[2, 5]`); `max_subsets` caps the number of subsets per size when C(n_assets, k) is large.  A summary of AIC/BIC changepoint counts is printed for mean and variance.
+`sub_sizes` specifies the subset sizes to analyse (default `[2, 5]`); `max_subsets` caps the number of subsets per size when C(n_assets, k) is large.  A summary of AIC/BIC changepoint counts is printed for mean and variance.  Supports `resample_ret`.
+
+---
+
+### Bootstrap resampling null test
+
+**`xresample_cp.f90`**  
+Reads asset prices, computes returns, and for each asset runs changepoint detection on the actual return series and on `n_resample` bootstrap-resampled (row-shuffled) copies.  Resampling destroys any serial structure, providing an empirical null distribution for the number of changepoints found by chance.
+
+For each series and analysis type the summary table reports:
+
+| Column | Meaning |
+|--------|---------|
+| `Actual` | BIC changepoint count for actual returns |
+| `RMean` | Mean BIC count over resampled runs |
+| `RMax` | Maximum BIC count over resampled runs |
+| `p-value` | Fraction of resampled runs with BIC count ≥ Actual |
+
+Key parameters:
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `n_resample` | 100 | Number of bootstrap runs |
+| `do_mean` | `.false.` | Detect mean changepoints |
+| `do_variance` | `.true.` | Detect variance changepoints |
+| `use_log_var` | `.true.` | Use log(c + r²) for variance series |
+| `var_offset` | 0.01 | Offset c in log(c + r²) |
+| `print_segs` | 1 | Segment detail level for actual returns |
+
+Progress is printed as run numbers on a single line during the resample loop.
+
+---
+
+### Variance criterion simulation
+
+**`xsim_variance_cp.f90`**  
+Monte Carlo simulation that compares the two variance series (r² and log(c + r²)) for detecting known changepoints.  Generates `n_sim` Gaussian time series with piecewise-constant standard deviation (`sigmas`) and reports for each criterion:
+
+- Mean number of changepoints found vs the true count
+- Fraction of simulations finding exactly the right number
+- Mean absolute location error when the count is exact
+- Mean distance from each found changepoint to the nearest true one (all simulations)
+- Histogram of the count of found changepoints
+
+Set `write_data = .true.` to write the last simulation to a text file (`sim_variance_cp.txt`) with columns `t, seg, r, r^2, log(c+r^2)` for external inspection.
+
+**`xsim_sd_changes.py`**  
+Python counterpart to `xsim_variance_cp.f90` using NumPy and `ruptures`.
+
+---
+
+### Generic data changepoints
+
+**`xdata_mean_variance_cp.f90`** · **`xdata_mean_variance_cp.py`**  
+Reads a plain matrix data file (not asset prices) and finds changepoints in the mean and/or variance of each column.  Suitable for any univariate time series data, not just financial returns.
+
+Input file format:
+```
+# nrow ncol [any other text]   ← first line: dimensions
+# further comment lines ...    ← skipped
+-1.42  0.87  1.03  ...         ← nrow rows of ncol whitespace-separated reals
+```
+
+The file is read by the `read_matrix` subroutine in `util.f90` (optional `nrow_max` and `ncol_max` arguments cap the dimensions read).
+
+Segment output uses `print_univar_segments`: for each segment prints `start`, `end`, `n`, `mean`, `sd`, `min`, `max`, `first`, `last`.
+
+Key parameters:
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `data_file` | `"sim_matrix.txt"` | Input file |
+| `do_mean` | `.false.` | Detect mean changepoints |
+| `do_variance` | `.true.` | Detect variance changepoints |
+| `use_log_var` | `.true.` | Use log(c + x²) for variance series |
+| `var_offset` | 0.01 | Offset c |
+| `max_col` | 3 | Maximum columns to analyse (0 = all) |
+| `print_table` | `.false.` | Print M/cost/AIC/BIC table |
+| `print_segs` | 1 | 0=none, 1=BIC model, 2=0..BIC, 3=all |
+
+The Python version (`xdata_mean_variance_cp.py`) uses `ruptures.Dynp` with a custom `GaussianProfileCost` class that matches the Fortran cost function exactly (n/2 · log(sample_variance)).  The `jump` parameter (default 5) controls the spacing of candidate breakpoint positions: `jump=1` is exact but O(n²); larger values trade a small positional rounding for substantial speed gains.
 
 ---
 
@@ -206,12 +298,12 @@ Reads asset prices, computes percent returns, and performs PCA on the full-sampl
 | File | Purpose |
 |------|---------|
 | `changepoint.f90` | Cost matrices (`cost_matrix`, `mean_shift_cost_matrix`, `multivar_cost_matrix`), DP solver (`solve_changepoints`), and backtracking helper (`segment_ends`) |
-| `io_utils.f90` | `print_model_selection`; segment printing for corrmat, covmat, and univariate models; `print_pca_loadings`; `keep_obs` |
+| `io_utils.f90` | `print_model_selection`; segment printing for corrmat, covmat, and univariate models (`print_univar_segments` prints mean, sd, min, max, first, last); `print_pca_loadings`; `keep_obs` |
 | `pca_jacobi.f90` | `jacobi_eigen_sym` (Jacobi eigenvalue method) and `principal_components_cov` |
 | `basic_stats.f90` | `mean`, `cov_mat`, `col_stats_ignore_nan`, `standardize_returns`, `biased_cov_sd`, `print_corr_mat`, `print_acf` |
-| `util.f90` | `sort_int`, `set_segment_values`, `print_wall_time`, `next_combination`, `n_choose_k`, `cumul_sum`, `print_square_matrix` |
+| `util.f90` | `sort_int`, `set_segment_values`, `print_wall_time`, `next_combination`, `n_choose_k`, `cumul_sum`, `print_square_matrix`, `read_matrix` |
 | `sim_changepoint.f90` | `generate_series` (bivariate), `generate_multivar_series` (multivariate) |
-| `dataframe_index_date.f90` | Date-indexed DataFrame type: `read_csv`, `pct_change`, `keep_rows`, `select`, etc. |
+| `dataframe_index_date.f90` | Date-indexed DataFrame type: `read_csv`, `pct_change` (with `dropna` option), `log_change`, `keep_rows`, `select`, `resample` |
 | `df_index_date_ops_mod.f90` | Index operations for the DataFrame |
 | `date.f90` | `Date` type and arithmetic |
 | `random.f90` | `rnorm` (scalar and vector) |
@@ -229,29 +321,35 @@ GNU make is required.  The compiler is gfortran (set `FC` in the Makefile to cha
 make -f Makefile.xcorr
 
 # Build and run individual programs
-make -f Makefile.xcorr run_sim          # xcorr_sim
-make -f Makefile.xcorr run_covar_sim    # xcovar_sim
-make -f Makefile.xcorr run_fit          # xcorr_fit
-make -f Makefile.xcorr run_corr         # xreturns_corr_cp
-make -f Makefile.xcorr run_cov          # xreturns_cov_cp
-make -f Makefile.xcorr run_covmat       # xreturns_covmat_cp
-make -f Makefile.xcorr run_corrmat      # xreturns_corrmat_cp
-make -f Makefile.xcorr run_corrmat_ol   # xreturns_corrmat_ol
-make -f Makefile.xcorr run_corrsub      # xreturns_corrsub_cp
-make -f Makefile.xcorr run_pca          # xreturns_pca
-make -f Makefile.xcorr run_var          # xreturns_variance_cp
-make -f Makefile.xcorr run_mean         # xreturns_mean_cp
-make -f Makefile.xcorr run_var_pwl      # xreturns_variance_pwl
-make -f Makefile.xcorr run_var_pwl_fast # xreturns_variance_pwl_fast
+make -f Makefile.xcorr run_sim             # xcorr_sim
+make -f Makefile.xcorr run_covar_sim       # xcovar_sim
+make -f Makefile.xcorr run_fit             # xcorr_fit
+make -f Makefile.xcorr run_corr            # xreturns_corr_cp
+make -f Makefile.xcorr run_cov             # xreturns_cov_cp
+make -f Makefile.xcorr run_covmat          # xreturns_covmat_cp
+make -f Makefile.xcorr run_corrmat         # xreturns_corrmat_cp
+make -f Makefile.xcorr run_corrmat_ol      # xreturns_corrmat_ol
+make -f Makefile.xcorr run_corrsub         # xreturns_corrsub_cp
+make -f Makefile.xcorr run_pca             # xreturns_pca
+make -f Makefile.xcorr run_var             # xreturns_variance_cp
+make -f Makefile.xcorr run_mean            # xreturns_mean_cp
+make -f Makefile.xcorr run_mean_var        # xreturns_mean_variance_cp
+make -f Makefile.xcorr run_var_pwl         # xreturns_variance_pwl
+make -f Makefile.xcorr run_var_pwl_fast    # xreturns_variance_pwl_fast
+make -f Makefile.xcorr run_resample_cp     # xresample_cp
+make -f Makefile.xcorr run_sim_var_cp      # xsim_variance_cp
+make -f Makefile.xcorr run_data_mean_var_cp # xdata_mean_variance_cp
 
 # Clean
 make -f Makefile.xcorr clean
 ```
 
-The Python program requires NumPy and pandas and runs without compilation:
+The Python programs require NumPy, pandas, and ruptures and run without compilation:
 
 ```bash
 python xreturns_corr_cp.py
+python xdata_mean_variance_cp.py
+python xsim_sd_changes.py
 ```
 
 The C++ program requires a C++17 compiler:
@@ -276,8 +374,12 @@ Timings on a typical desktop for the full `spy_efa_eem_tlt.csv` dataset (n ≈ 5
 | `xreturns_corrmat_cp` | ~15 s |
 | `xcovar_sim` (n = 2 000) | ~0.3 s |
 | `xreturns_corrmat_ol` (step = 63) | ~minutes |
+| `xsim_variance_cp` (n_sim = 1 000, n = 1 500) | ~seconds |
+| `xdata_mean_variance_cp.py` (n = 3 000, jump = 5) | ~20 s |
 
 The dominant cost in all programs is the O(n² × max_m) dynamic programming step.  The joint covariance and correlation matrix programs add an O(p³) Cholesky per cost matrix cell.  The online program repeats the full DP at each step, so total work is O(n³/step).
+
+For the Python `xdata_mean_variance_cp.py`, runtime scales as O((n/jump)²) per series; `jump=5` is ~250× faster than `jump=1` with negligible loss of precision on typical data.
 
 ---
 
