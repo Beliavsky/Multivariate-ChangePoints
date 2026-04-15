@@ -36,7 +36,7 @@ program xreturns_mean_variance_cp
     logical, parameter :: do_mean      = .true.
     logical, parameter :: do_variance  = .true.  ! .true.
     integer, parameter :: print_segs   = 1       ! 0=none, 1=BIC only, 2=0..BIC, 3=all
-    logical, parameter :: resample_ret = .true. ! .true. = shuffle rows (null hypothesis check)
+    logical, parameter :: resample_ret = .false. ! .true. = shuffle rows (null hypothesis check)
 
     integer :: n, n_col, j, ba, bb, ms, m_lo, m_hi
     real(kind=dp), allocatable :: dp_table(:,:), R(:,:), z(:)
