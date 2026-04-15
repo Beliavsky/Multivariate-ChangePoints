@@ -1,4 +1,5 @@
-Trimmed output of `xreturns_mean_variance_cp.f90`
+Trimmed output of `xreturns_mean_variance_cp.f90`. The stock market crash in 2008 from 2008-09-15 to 2008-12-01 is apparent,
+with very negative returns and annualized volatility of 78%.
 
 ```
 read 4607 days and 1 columns from asset_class_etf_prices.csv
