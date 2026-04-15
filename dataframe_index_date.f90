@@ -708,10 +708,10 @@ if (allocated(self%index)) deallocate(self%index)
 if (allocated(self%columns)) deallocate(self%columns)
 if (allocated(self%values)) deallocate(self%values)
 
-open(newunit=unit, file=filename, status='old', action='read', iostat=io)
-if (io /= 0) error stop "Error opening file in read_csv"
+open(newunit=unit, file=filename, status="old", action="read", iostat=io)
+if (io /= 0) error stop "Error opening " // trim(filename) // " in read_csv"
 
-read(unit, '(A)', iostat=io) line
+read(unit, "(A)", iostat=io) line
 if (io /= 0) error stop "Error reading header line in read_csv"
 
 call split_string(line, ",", tokens)
@@ -729,18 +729,18 @@ do
    if (present(max_rows)) then
       if (nrows >= max_rows) exit
    end if
-   read(unit, '(A)', iostat=io) line
+   read(unit, "(A)", iostat=io) line
    if (io /= 0 .or. trim(line) == "") exit
    nrows = nrows + 1
 end do
 if (nrows == 0) error stop "No data lines detected in read_csv"
 
 rewind(unit)
-read(unit, '(A)')
+read(unit, "(A)")
 
 allocate(self%index(nrows), self%values(nrows, ncols))
 do i = 1, nrows
-   read(unit, '(A)', iostat=io) line
+   read(unit, "(A)", iostat=io) line
    if (io /= 0) error stop "Error reading data row in read_csv"
    if (trim(line) == "") exit
    call split_string(line, ",", tokens)
@@ -764,7 +764,7 @@ end subroutine read_csv
 ! the first nrows_print/2 and the last (nrows_print - nrows_print/2) rows are
 ! printed with an indication of omitted rows.
 !
-! An optional logical argument 'print_all' may be provided. If it is present
+! An optional logical argument "print_all" may be provided. If it is present
 ! and set to .true., then all rows are printed.
 !------------------------------------------------------------------
 impure elemental subroutine display_data(self, print_all, fmt_ir, fmt_header, fmt_trailer, title)
@@ -784,25 +784,25 @@ write(*,fmt_header_) "index", (trim(self%columns(i)), i=1,size(self%columns))
 
 if (print_all_) then
    do i = 1, total
-      write(*,'(a10)', advance='no') self%index(i)%to_str()
+      write(*,"(a10)", advance="no") self%index(i)%to_str()
       write(*,fmt_ir_) self%values(i,:)
    end do
 else
    if (total <= nrows_print) then
       do i = 1, total
-         write(*,'(a10)', advance='no') self%index(i)%to_str()
+         write(*,"(a10)", advance="no") self%index(i)%to_str()
          write(*,fmt_ir_) self%values(i,:)
       end do
    else
       n_top = nrows_print / 2
       n_bottom = nrows_print - n_top
       do i = 1, n_top
-         write(*,'(a10)', advance='no') self%index(i)%to_str()
+         write(*,"(a10)", advance="no") self%index(i)%to_str()
          write(*,fmt_ir_) self%values(i,:)
       end do
       write(*,*) "   ... (", total - nrows_print, " rows omitted) ..."
       do i = total - n_bottom + 1, total
-         write(*,'(a10)', advance='no') self%index(i)%to_str()
+         write(*,"(a10)", advance="no") self%index(i)%to_str()
          write(*,fmt_ir_) self%values(i,:)
       end do
    end if
@@ -820,10 +820,10 @@ class(DataFrame_index_date), intent(in) :: self
 character(len=*), intent(in) :: filename
 integer :: i, j, unit, io
 
-open(newunit=unit, file=filename, status='replace', action='write', iostat=io)
-if (io /= 0) error stop "Error opening output file in write_csv"
+open(newunit=unit, file=filename, status="replace", action="write", iostat=io)
+if (io /= 0) error stop "Error opening " // trim(filename) // " in write_csv"
 
-write(unit,'(A)', advance='no') ""
+write(unit,"(A)", advance="no") ""
 do j = 1, size(self%columns)
    write(unit,'(",", A)', advance='no') trim(self%columns(j))
 end do
