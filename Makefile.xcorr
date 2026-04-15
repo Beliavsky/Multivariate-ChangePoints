@@ -1,20 +1,23 @@
-exec = xcorr_sim xcovar_sim xcorr_fit xreturns_corr_cp xreturns_cov_cp xreturns_covmat_cp xreturns_variance_cp xreturns_mean_cp xreturns_variance_pwl xreturns_variance_pwl_fast
+exec = xcorr_sim xcovar_sim xcorr_fit xreturns_corr_cp xreturns_cov_cp xreturns_covmat_cp xreturns_corrmat_cp xreturns_variance_cp xreturns_mean_cp xreturns_variance_pwl xreturns_variance_pwl_fast xreturns_corrsub_cp xreturns_pca xreturns_corrmat_ol
 FC   = gfortran
 opt  = -O3 -Wall -static -g
 
 all: $(exec)
 
 # Define objects
-obj_sim      = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o io_utils.o xcorr_sim.o
-obj_covar_sim = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o io_utils.o xcovar_sim.o
-obj_fit  = kind.o constants.o util.o random.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xcorr_fit.o
-obj_corr = kind.o constants.o util.o random.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_corr_cp.o
-obj_cov    = kind.o constants.o util.o random.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_cov_cp.o
-obj_covmat = kind.o constants.o util.o random.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_covmat_cp.o
-obj_var  = kind.o constants.o util.o random.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_variance_cp.o
-obj_mean = kind.o constants.o util.o random.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_mean_cp.o
+obj_sim      = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xcorr_sim.o
+obj_covar_sim = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xcovar_sim.o
+obj_fit  = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xcorr_fit.o
+obj_corr = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_corr_cp.o
+obj_cov    = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_cov_cp.o
+obj_covmat   = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_covmat_cp.o
+obj_corrmat  = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_corrmat_cp.o
+obj_var  = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_variance_cp.o
+obj_mean = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_mean_cp.o
 obj_var_pwl = kind.o constants.o util.o random.o basic_stats.o changepoint.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_variance_pwl.o
 obj_var_pwl_fast = kind.o constants.o util.o random.o basic_stats.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_variance_pwl_fast.o
+obj_corrsub  = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_corrsub_cp.o
+obj_pca      = kind.o util.o basic_stats.o pca_jacobi.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_pca.o
 
 # Generic rule
 %.o: %.f90
@@ -38,13 +41,13 @@ random.o: random.f90 kind.o constants.o
 basic_stats.o: basic_stats.f90 kind.o util.o
 	$(FC) $(opt) -c basic_stats.f90
 
-changepoint.o: changepoint.f90 kind.o
+changepoint.o: changepoint.f90 kind.o util.o
 	$(FC) $(opt) -c changepoint.f90
 
 sim_changepoint.o: sim_changepoint.f90 kind.o random.o
 	$(FC) $(opt) -c sim_changepoint.f90
 
-io_utils.o: io_utils.f90 kind.o basic_stats.o util.o
+io_utils.o: io_utils.f90 kind.o basic_stats.o util.o pca_jacobi.o dataframe_index_date.o df_index_date_ops_mod.o date.o
 	$(FC) $(opt) -c io_utils.f90
 
 dataframe_index_date.o: dataframe_index_date.f90 kind.o util.o date.o df_index_date_ops_mod.o
@@ -68,8 +71,11 @@ xreturns_corr_cp.o: xreturns_corr_cp.f90 kind.o util.o basic_stats.o changepoint
 xreturns_cov_cp.o: xreturns_cov_cp.f90 kind.o util.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
 	$(FC) $(opt) -c xreturns_cov_cp.f90
 
-xreturns_covmat_cp.o: xreturns_covmat_cp.f90 kind.o util.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+xreturns_covmat_cp.o: xreturns_covmat_cp.f90 kind.o util.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o pca_jacobi.o
 	$(FC) $(opt) -c xreturns_covmat_cp.f90
+
+xreturns_corrmat_cp.o: xreturns_corrmat_cp.f90 kind.o util.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+	$(FC) $(opt) -c xreturns_corrmat_cp.f90
 
 xreturns_variance_cp.o: xreturns_variance_cp.f90 kind.o util.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
 	$(FC) $(opt) -c xreturns_variance_cp.f90
@@ -101,6 +107,9 @@ xreturns_cov_cp: $(obj_cov)
 xreturns_covmat_cp: $(obj_covmat)
 	$(FC) $(opt) -o xreturns_covmat_cp $(obj_covmat)
 
+xreturns_corrmat_cp: $(obj_corrmat)
+	$(FC) $(opt) -o xreturns_corrmat_cp $(obj_corrmat)
+
 xreturns_variance_cp: $(obj_var)
 	$(FC) $(opt) -o xreturns_variance_cp $(obj_var)
 
@@ -113,7 +122,30 @@ xreturns_variance_pwl: $(obj_var_pwl)
 xreturns_variance_pwl_fast: $(obj_var_pwl_fast)
 	$(FC) $(opt) -o xreturns_variance_pwl_fast $(obj_var_pwl_fast)
 
-run: run_sim run_covar_sim run_fit run_corr run_cov run_covmat run_var run_mean run_var_pwl run_var_pwl_fast
+xreturns_corrsub_cp.o: xreturns_corrsub_cp.f90 kind.o util.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+	$(FC) $(opt) -c xreturns_corrsub_cp.f90
+
+xreturns_corrsub_cp: $(obj_corrsub)
+	$(FC) $(opt) -o xreturns_corrsub_cp $(obj_corrsub)
+
+pca_jacobi.o: pca_jacobi.f90 kind.o
+	$(FC) $(opt) -c pca_jacobi.f90
+
+xreturns_pca.o: xreturns_pca.f90 kind.o util.o basic_stats.o pca_jacobi.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+	$(FC) $(opt) -c xreturns_pca.f90
+
+xreturns_pca: $(obj_pca)
+	$(FC) $(opt) -o xreturns_pca $(obj_pca)
+
+obj_corrmat_ol = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o xreturns_corrmat_ol.o
+
+xreturns_corrmat_ol.o: xreturns_corrmat_ol.f90 kind.o util.o basic_stats.o changepoint.o io_utils.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+	$(FC) $(opt) -c xreturns_corrmat_ol.f90
+
+xreturns_corrmat_ol: $(obj_corrmat_ol)
+	$(FC) $(opt) -o xreturns_corrmat_ol $(obj_corrmat_ol)
+
+run: run_sim run_covar_sim run_fit run_corr run_cov run_covmat run_corrmat run_var run_mean run_var_pwl run_var_pwl_fast run_corrsub run_pca run_corrmat_ol
 
 run_sim: xcorr_sim
 	./xcorr_sim
@@ -133,6 +165,9 @@ run_cov: xreturns_cov_cp
 run_covmat: xreturns_covmat_cp
 	./xreturns_covmat_cp
 
+run_corrmat: xreturns_corrmat_cp
+	./xreturns_corrmat_cp
+
 run_var: xreturns_variance_cp
 	./xreturns_variance_cp
 
@@ -144,6 +179,15 @@ run_var_pwl: xreturns_variance_pwl
 
 run_var_pwl_fast: xreturns_variance_pwl_fast
 	./xreturns_variance_pwl_fast
+
+run_corrsub: xreturns_corrsub_cp
+	./xreturns_corrsub_cp
+
+run_pca: xreturns_pca
+	./xreturns_pca
+
+run_corrmat_ol: xreturns_corrmat_ol
+	./xreturns_corrmat_ol
 
 clean:
 	rm -f *.o *.mod $(exec)

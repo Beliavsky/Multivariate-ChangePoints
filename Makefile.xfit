@@ -5,12 +5,20 @@ opt  = -O3 -Wall -static -g
 all: $(exec)
 
 # Define objects
-obj_sim = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o io_utils.o xcorr_sim.o
-obj_fit = kind.o constants.o util.o basic_stats.o changepoint.o io_utils.o xcorr_fit.o
+obj_sim = kind.o constants.o util.o random.o basic_stats.o changepoint.o sim_changepoint.o pca_jacobi.o dataframe_index_date.o df_index_date_ops_mod.o date.o io_utils.o xcorr_sim.o
+obj_fit = kind.o constants.o util.o random.o basic_stats.o changepoint.o pca_jacobi.o dataframe_index_date.o df_index_date_ops_mod.o date.o io_utils.o xcorr_fit.o
 
 # Generic rule
 %.o: %.f90
 	$(FC) $(opt) -c $<
+
+# Explicit ordering dependencies
+date.o: date.f90
+df_index_date_ops_mod.o: df_index_date_ops_mod.f90 date.o
+dataframe_index_date.o: dataframe_index_date.f90 date.o df_index_date_ops_mod.o
+io_utils.o: io_utils.f90 basic_stats.o pca_jacobi.o dataframe_index_date.o df_index_date_ops_mod.o date.o
+xcorr_sim.o: xcorr_sim.f90 basic_stats.o changepoint.o sim_changepoint.o io_utils.o
+xcorr_fit.o: xcorr_fit.f90 basic_stats.o changepoint.o io_utils.o
 
 xcorr_sim: $(obj_sim)
 	$(FC) $(opt) -o xcorr_sim $(obj_sim)
