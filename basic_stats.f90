@@ -10,7 +10,7 @@ public :: mean, variance, sd, mean_and_sd, kurtosis, basic_stats, &
    stat, stats, corr_mat, rms, moving_sum, moving_average, moving_sd, moving_rms, &
    weighted_sd, &
    print_corr_mat, skew, cov, cov_mat, print_cov_mat, print_acf_mat, &
-   print_acf, col_stats_ignore_nan
+   print_acf, col_stats_ignore_nan, standardize_returns, biased_cov_sd
 integer, parameter :: nbasic_stats = 6
 character (len=*), parameter :: basic_stats_names(nbasic_stats) = &
    [character(len=4) :: "mean", "sd", "skew", "kurt", "min", "max"]
@@ -29,7 +29,7 @@ interface acf
 end interface acf
 contains
 
-function stats_many_vec(funcs, x) result(y)
+pure function stats_many_vec(funcs, x) result(y)
 ! return statistics on x(:)
 character (len=*), intent(in) :: funcs(:)
 real(kind=dp), intent(in) :: x(:)
@@ -40,7 +40,7 @@ do i=1,size(funcs)
 end do
 end function stats_many_vec
 
-function stats_many_mat(funcs, x) result(y)
+pure function stats_many_mat(funcs, x) result(y)
 ! return a matrix of statistics on each column of x(:,:)
 character (len=*), intent(in) :: funcs(:)
 real(kind=dp), intent(in) :: x(:,:)
@@ -51,7 +51,7 @@ do i=1,size(x,2)
 end do
 end function stats_many_mat
 
-function stat(func, x) result(y)
+pure function stat(func, x) result(y)
 ! return a statistic on x(:)
 character (len=*), intent(in) :: func
 real(kind=dp), intent(in) :: x(:)
@@ -454,7 +454,7 @@ do i=k+1,n
 end do
 end function moving_average
 
-subroutine col_stats_ignore_nan(x, n, mean_x, sd_x, min_x, max_x) ! compute basic stats ignoring nan values
+pure subroutine col_stats_ignore_nan(x, n, mean_x, sd_x, min_x, max_x) ! compute basic stats ignoring nan values
 real(kind=dp), intent(in) :: x(:)
 integer, intent(out) :: n
 real(kind=dp), intent(out) :: mean_x, sd_x, min_x, max_x
@@ -553,5 +553,73 @@ xw_mean = sum(w * x) / w_sum
 var = sum(w * (x - xw_mean)**2) / w_sum
 xsd = sqrt(max(0.0_dp, var))
 end function weighted_sd
+
+function standardize_returns(R, use_ewma, ewma_lambda) result(R_std)
+    !> Standardise a returns matrix R(n, p) column-by-column.
+    !> use_ewma=.true.:  EWMA (RiskMetrics) normalisation with decay ewma_lambda.
+    !> use_ewma=.false.: global normalisation (subtract mean, divide by full-sample sd).
+    real(kind=dp), intent(in) :: R(:,:)
+    logical, intent(in)       :: use_ewma
+    real(kind=dp), intent(in) :: ewma_lambda
+    real(kind=dp), allocatable :: R_std(:,:)
+    real(kind=dp), allocatable :: glob_mean(:), glob_sd(:)
+    real(kind=dp) :: var_t, sig_t
+    integer :: n, p, a, i
+
+    n = size(R, 1)
+    p = size(R, 2)
+    allocate(R_std(n, p), glob_mean(p), glob_sd(p))
+
+    do a = 1, p
+        glob_mean(a) = sum(R(:, a)) / n
+        glob_sd(a)   = sqrt(sum((R(:, a) - glob_mean(a))**2) / n)
+    end do
+
+    if (use_ewma) then
+        print "('normalisation: EWMA (lambda=',f0.2,')')", ewma_lambda
+        do a = 1, p
+            var_t = max(glob_sd(a)**2, tiny(1.0_dp))
+            do i = 1, n
+                sig_t      = sqrt(var_t)
+                R_std(i,a) = (R(i,a) - glob_mean(a)) / sig_t
+                var_t      = ewma_lambda * var_t + &
+                             (1.0_dp - ewma_lambda) * (R(i,a) - glob_mean(a))**2
+                var_t      = max(var_t, tiny(1.0_dp))
+            end do
+        end do
+    else
+        print "('normalisation: global (constant sigma)')"
+        do a = 1, p
+            if (glob_sd(a) > 0.0_dp) then
+                R_std(:, a) = (R(:, a) - glob_mean(a)) / glob_sd(a)
+            else
+                R_std(:, a) = 0.0_dp
+            end if
+        end do
+    end if
+end function standardize_returns
+
+pure subroutine biased_cov_sd(R, S, sd_vec)
+    !> Compute the biased sample covariance matrix S and standard deviations sd_vec
+    !! of the columns of R.  Divides by n (not n-1).
+    real(kind=dp), intent(in)  :: R(:,:)
+    real(kind=dp), intent(out) :: S(:,:), sd_vec(:)
+    real(kind=dp) :: mu(size(R,2))
+    integer :: a, b, m, p
+    m = size(R, 1)
+    p = size(R, 2)
+    do a = 1, p
+        mu(a) = sum(R(:, a)) / m
+    end do
+    do a = 1, p
+        do b = a, p
+            S(a,b) = sum((R(:,a) - mu(a)) * (R(:,b) - mu(b))) / m
+            S(b,a) = S(a,b)
+        end do
+    end do
+    do a = 1, p
+        sd_vec(a) = sqrt(max(S(a,a), 0.0_dp))
+    end do
+end subroutine biased_cov_sd
 
 end module basic_stats_mod
